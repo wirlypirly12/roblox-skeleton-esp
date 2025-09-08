@@ -47,6 +47,7 @@ local scene = Instance.new("ScreenGui", game:GetService("CoreGui"));
 scene.IgnoreGuiInset = true;
 scene.Name = "not_scene";
 
+
 local players = game:GetService("Players");
 local localPlayer = players.LocalPlayer;
 local runservice = game:GetService("RunService");
@@ -140,7 +141,15 @@ setmetatable(drawings, {
 })
 
 local should_unload = false;
+local last_ran = 0;
+
 local conn; conn = runservice.RenderStepped:Connect(function()
+    -- yield 2 frames (optimizastion)
+    if (os.clock() - last_ran) < (1/105) then
+        return;
+    end
+    last_ran = os.clock();
+
     if should_unload then
         destroy_drawings(nil)
         if conn then
@@ -166,12 +175,14 @@ local conn; conn = runservice.RenderStepped:Connect(function()
         local position, onscreen = camera:WorldToViewportPoint(hrp.Position);
         if not onscreen then
             hide_drawings(v)
-            continue
-        end;
+            continue;
+        end
 
         local draw_data = drawings[v];
         local cache = cache_obj(char);
-
+        if not cache then
+            continue
+        end;
         for index, skel_data in next, rig do
             local data_from = cache[skel_data[1]];
             local data_to = cache[skel_data[2]];
@@ -183,7 +194,12 @@ local conn; conn = runservice.RenderStepped:Connect(function()
                 data_from = {true, camera:WorldToViewportPoint(mid)};
             end
 
+            if not data_from or not data_to then
+                continue;
+            end
+            
             local from = data_from[1];
+            
             local to = data_to[1];
 
             local skeleton_from_2d = data_from[2];
@@ -208,11 +224,6 @@ local conn; conn = runservice.RenderStepped:Connect(function()
             end
         end
     end
-
-    -- yield 2 frames (optimizastion)
-    for i = 1, 2 do
-        runservice.RenderStepped:Wait();
-    end
 end)
 
 -- unload
@@ -221,7 +232,7 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
         return
     end
 
-    if input and input.KeyCode and input.KeyCode == Enum.KeyCode.J then
+    if input.KeyCode and input.KeyCode == Enum.KeyCode.J then
         should_unload = true
     end
 end)
