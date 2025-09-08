@@ -33,7 +33,7 @@ local rig = {
 local drawings = {};
 
 
--- if you have a working drawing library ignore this line
+-- if you have a working drawing library comment this line
 local Drawing = loadstring(game:HttpGet("https://raw.githubusercontent.com/MirayXS/Roblox-Drawing-Lib/refs/heads/main/main.lua"))();
 
 local scene = Instance.new("ScreenGui", game:GetService("CoreGui"));
