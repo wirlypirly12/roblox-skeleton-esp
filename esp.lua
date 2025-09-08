@@ -3,8 +3,8 @@ local rig = {
     {"Head", "UpperTorso"},
 
     -- shoulders
-    {"UpperTorso", "RightUpperArm"},
-    {"UpperTorso", "LeftUpperArm"},
+    {"l_neck", "RightUpperArm"},
+    {"l_neck", "LeftUpperArm"},
 
     -- right arm
     {"RightUpperArm", "RightLowerArm"},
@@ -32,85 +32,117 @@ local rig = {
 
 local drawings = {};
 
--- if you have a working drawing library comment these lines
---
+-- if you have a working drawing library comment this line
+
 local succ, Drawing = pcall(function()
     return loadstring(game:HttpGet("https://raw.githubusercontent.com/MirayXS/Roblox-Drawing-Lib/refs/heads/main/main.lua"))();
 end)
 
 if not succ then
     warn("issue: ".. Drawing);
-    Drawing = getrenv().Drawing; -- well, better to have a table than a string
+    Drawing = getrenv().Drawing;
 end
 
 local scene = Instance.new("ScreenGui", game:GetService("CoreGui"));
 scene.IgnoreGuiInset = true;
 scene.Name = "not_scene";
---
 
 local players = game:GetService("Players");
 local localPlayer = players.LocalPlayer;
 local runservice = game:GetService("RunService");
 local camera = workspace.CurrentCamera;
-
 local identifyexecutor = identifyexecutor or function() return "" end
 
-local create_drawing: (Player)->nil = function(plr)
-    drawings[plr] = {};
 
+local midpoint: (Vector3, Vector3)->Vector3 = function(a, b)
+    return (a+b)/2;
+end
+local add_line: ()->drawing_object = function()
+    local d;
+    if identifyexecutor():find("Velocity") then
+        d = Drawing.new("Line", scene);
+    else
+        d = Drawing.new("Line");
+    end
+    return d;
+end
+
+local create_drawing: (Player)->nil = function(plr)
+    rawset(drawings, plr, {});
     for i, v in next, rig do
-        local d;
-        if identifyexecutor():find("Velocity") then
-            d = Drawing.new("Line", scene);
-        else
-            d = Drawing.new("Line");
-        end
+        local d = add_line();
         d.Thickness = 1;
         d.Color = Color3.fromRGB(0, 165, 255);
         d.Visible = false;
 
-        drawings[plr][#drawings[plr]+1] = d;
+        local p_drawings = rawget(drawings, plr)
+        rawset(p_drawings, #p_drawings+1, d)
     end
-end
-
-local has_drawings: (Player)->boolean = function(plr)
-    return drawings[plr] ~= nil and true or false;
 end
 
 local hide_drawings: (Player)->boolean = function(plr)
-    if not has_drawings(plr) then
-        return false
-    end
-
-    for i,v in next, drawings[plr] do
+    local draw_data = drawings[plr]
+    for i,v in next, draw_data do
         v.Visible = false;
     end
     return true;
 end
 
 local destroy_drawings: (Player)->boolean = function(plr)
-    if not has_drawings(plr) then
-        return false
+    if plr == nil then
+        for i,v in next, drawings do
+            for index, drawing in next, v do
+                drawing:Remove();
+            end
+            drawings[i] = nil;
+        end
+        drawings = {};
+        return true;
     end
 
     for i, v in next, drawings[plr] do
         v:Remove();
     end
-
     drawings[plr] = nil;
     return true
 end
 
-local should_unload = false;
+local cache_obj: (Model)->table? = function(char)
+    local cache = { };
 
-local conn; conn = runservice.Heartbeat:Connect(function()
-    if should_unload then
-        for i, v in next, drawings do
-            for index, drawing in next, v do
-                drawing:Remove();
+    for i, skel_data in next, rig do
+        for index, part_name in ipairs(skel_data) do
+            if part_name == "l_neck" then continue end;
+            if not cache[part_name] then
+                local entry = char:FindFirstChild(part_name);
+                if not entry then
+                    continue
+                end
+                local position = camera:WorldToViewportPoint(entry.Position);
+                cache[part_name] = {entry, position};
             end
         end
+    end
+    return cache;
+end
 
+setmetatable(drawings, {
+    __index = function(t, plr)
+        local entry = rawget(t, plr);
+
+        if entry == nil then
+            create_drawing(plr);
+            entry = rawget(t, plr);
+        end
+        return entry;
+    end,
+    __mode = "k"
+})
+
+local should_unload = false;
+local conn; conn = runservice.RenderStepped:Connect(function()
+    if should_unload then
+        destroy_drawings(nil)
         if conn then
             conn:Disconnect()
         end
@@ -118,9 +150,6 @@ local conn; conn = runservice.Heartbeat:Connect(function()
 
     for i, v in next, players:GetPlayers() do
         if v == localPlayer then continue; end
-        if v.Team and v.Team == localPlayer.Team then
-            continue
-        end
         
         local char = v and v.Character or nil;
         if not char then
@@ -141,30 +170,32 @@ local conn; conn = runservice.Heartbeat:Connect(function()
         end;
 
         local draw_data = drawings[v];
-        if not draw_data then
-            create_drawing(v);
-            draw_data = drawings[v];
-        end
+        local cache = cache_obj(char);
 
         for index, skel_data in next, rig do
-            local from = char:FindFirstChild(skel_data[1]);
-            if not from then
-                continue;
+            local data_from = cache[skel_data[1]];
+            local data_to = cache[skel_data[2]];
+
+            if skel_data[1] == "l_neck" then
+                local head = cache["Head"][1];
+                local upper_torso = cache["UpperTorso"][1];
+                local mid = midpoint(head.Position, upper_torso.Position)
+                data_from = {true, camera:WorldToViewportPoint(mid)};
             end
-            local to = char:FindFirstChild(skel_data[2])
-            if not to then
-                continue;
-            end
-            
-            local skeleton_from_2d = camera:WorldToViewportPoint(from.Position);
-            local skeleton_to_2d = camera:WorldToViewportPoint(to.Position);
+
+            local from = data_from[1];
+            local to = data_to[1];
+
+            local skeleton_from_2d = data_from[2];
+            local skeleton_to_2d = data_to[2];
+
 
             local this_line = drawings[v][index];
             if not this_line then
                 continue
             end
 
-            -- convert into screen positions
+            -- elimante the y cord.
             from = Vector2.new(skeleton_from_2d.X, skeleton_from_2d.Y)
             to = Vector2.new(skeleton_to_2d.X, skeleton_to_2d.Y);
 
@@ -178,10 +209,9 @@ local conn; conn = runservice.Heartbeat:Connect(function()
         end
     end
 
-
-    -- yield 2 frames
+    -- yield 2 frames (optimizastion)
     for i = 1, 2 do
-        runservice.Heartbeat:Wait();
+        runservice.RenderStepped:Wait();
     end
 end)
 
