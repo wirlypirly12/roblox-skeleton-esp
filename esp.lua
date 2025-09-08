@@ -32,19 +32,28 @@ local rig = {
 
 local drawings = {};
 
+-- if you have a working drawing library comment these lines
+--
+local succ, Drawing = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/MirayXS/Roblox-Drawing-Lib/refs/heads/main/main.lua"))();
+end)
 
--- if you have a working drawing library comment this line
-local Drawing = loadstring(game:HttpGet("https://raw.githubusercontent.com/MirayXS/Roblox-Drawing-Lib/refs/heads/main/main.lua"))();
+if not succ then
+    warn("issue: ".. Drawing);
+    Drawing = getrenv().Drawing; -- well, better to have a table than a string
+end
 
 local scene = Instance.new("ScreenGui", game:GetService("CoreGui"));
 scene.IgnoreGuiInset = true;
 scene.Name = "not_scene";
-
+--
 
 local players = game:GetService("Players");
 local localPlayer = players.LocalPlayer;
 local runservice = game:GetService("RunService");
 local camera = workspace.CurrentCamera;
+
+local identifyexecutor = identifyexecutor or function() return "" end
 
 local create_drawing: (Player)->nil = function(plr)
     drawings[plr] = {};
@@ -64,14 +73,32 @@ local create_drawing: (Player)->nil = function(plr)
     end
 end
 
-local hide_drawings: ()->nil = function(plr)
-    if not drawings[plr] then
-        return
+local has_drawings: (Player)->boolean = function(plr)
+    return drawings[plr] ~= nil and true or false;
+end
+
+local hide_drawings: (Player)->boolean = function(plr)
+    if not has_drawings(plr) then
+        return false
     end
 
     for i,v in next, drawings[plr] do
         v.Visible = false;
     end
+    return true;
+end
+
+local destroy_drawings: (Player)->boolean = function(plr)
+    if not has_drawings(plr) then
+        return false
+    end
+
+    for i, v in next, drawings[plr] do
+        v:Remove();
+    end
+
+    drawings[plr] = nil;
+    return true
 end
 
 local should_unload = false;
@@ -88,6 +115,7 @@ local conn; conn = runservice.Heartbeat:Connect(function()
             conn:Disconnect()
         end
     end
+
     for i, v in next, players:GetPlayers() do
         if v == localPlayer then continue; end
         if v.Team and v.Team == localPlayer.Team then
@@ -96,13 +124,13 @@ local conn; conn = runservice.Heartbeat:Connect(function()
         
         local char = v and v.Character or nil;
         if not char then
-            hide_drawings(v)
+            destroy_drawings(v)
             continue;
         end
 
         local hrp = char:FindFirstChild("HumanoidRootPart");
         if not hrp then
-            hide_drawings(v)
+            destroy_drawings(v)
             continue;
         end
 
@@ -127,7 +155,7 @@ local conn; conn = runservice.Heartbeat:Connect(function()
             if not to then
                 continue;
             end
-                
+            
             local skeleton_from_2d = camera:WorldToViewportPoint(from.Position);
             local skeleton_to_2d = camera:WorldToViewportPoint(to.Position);
 
@@ -144,11 +172,20 @@ local conn; conn = runservice.Heartbeat:Connect(function()
                 this_line.From = from
                 this_line.To = to
             end
-            this_line.Visible = true;
+            if not this_line.Visible then
+                this_line.Visible = true;
+            end
         end
+    end
+
+
+    -- yield 2 frames
+    for i = 1, 2 do
+        runservice.Heartbeat:Wait();
     end
 end)
 
+-- unload
 game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
     if gpe then
         return
@@ -159,10 +196,4 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
     end
 end)
 
-players.PlayerRemoving:Connect(function(plr)
-    if drawings[plr] then
-        for i, v in next, drawings[plr] do
-            v:Remove();
-        end
-    end
-end)
+players.PlayerRemoving:Connect(destroy_drawings)
