@@ -135,9 +135,10 @@ local conn; conn = runservice.Heartbeat:Connect(function()
             if not this_line then
                 continue
             end
-            
-            local from = Vector2.new(skeleton_from_2d.X, skeleton_from_2d.Y)
-            local to = Vector2.new(skeleton_to_2d.X, skeleton_to_2d.Y);
+
+            -- convert into screen positions
+            from = Vector2.new(skeleton_from_2d.X, skeleton_from_2d.Y)
+            to = Vector2.new(skeleton_to_2d.X, skeleton_to_2d.Y);
 
             if (from ~= this_line.From or to ~= this_line.To) then
                 this_line.From = from
