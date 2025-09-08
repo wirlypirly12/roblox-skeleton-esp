@@ -120,12 +120,14 @@ local conn; conn = runservice.Heartbeat:Connect(function()
 
         for index, skel_data in next, rig do
             local from = char:FindFirstChild(skel_data[1]);
-            local to = char:FindFirstChild(skel_data[2])
-
-            if not from or not to then
+            if not from then
                 continue;
             end
-
+            local to = char:FindFirstChild(skel_data[2])
+            if not to then
+                continue;
+            end
+                
             local skeleton_from_2d = camera:WorldToViewportPoint(from.Position);
             local skeleton_to_2d = camera:WorldToViewportPoint(to.Position);
 
