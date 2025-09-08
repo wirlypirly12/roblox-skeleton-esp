@@ -145,7 +145,7 @@ local last_ran = 0;
 
 local conn; conn = runservice.RenderStepped:Connect(function()
     -- yield 2 frames (optimizastion)
-    if (os.clock() - last_ran) < (1/105) then
+    if (os.clock() - last_ran) < (1/165) then
         return;
     end
     last_ran = os.clock();
