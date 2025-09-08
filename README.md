@@ -1,0 +1,1 @@
+This script is compatible with any Roblox game that uses native R15 rigs/characters, and it can be easily modified to support custom rigs or R6 characters. For the best performance, I recommend using the exploits native Drawing library. However, I use a custom one here because the one in my exploit was broken during testing.
